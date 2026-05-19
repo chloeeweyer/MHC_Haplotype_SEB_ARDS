@@ -1,0 +1,768 @@
+---
+title: "SEB Manuscript Code"
+author: "Chloe Weyer-Nichols"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(verbose = FALSE, message = FALSE, warning = FALSE)
+```
+#Host MHC Haplotypes Dictate Susceptibility to Bacterial Superantigen-Induced Acute Respiratory Distress Syndrome 
+## Authors: Chloe E. Weyer-Nichols1, Taylor H. Carter1, Kiesha M. Wilson1, Prakash Nagarkatti1, Mitzi Nagarkatti1*
+### Institutions: 1Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
+### Corresponding Author: Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
+##Manuscript Code for Reproducibility
+###Loading Required Libraries
+```{r}
+library(Seurat)
+library(dplyr) 
+library(patchwork)
+library(readr) 
+library("data.table") 
+library(knitr)
+library(ggplot2)
+library(DoubletFinder)
+library(ggrepel)
+library(tidyr)
+library(gt)
+library(glue)
+library(glmGamPoi)
+```
+
+##Figure 3
+
+####Figure 3A
+```{r}
+integrated <- readRDS(file = "files/integrated.RDS")
+```
+
+```{r}
+#loading unannotated RDS object
+integrated1 <- integrated
+Idents(integrated1) <- integrated1$seurat_clusters
+#numeric cluster names
+numeric_cluster_ids <- Idents(integrated1)
+#annotate clusters
+truncated.cluster.ids <- c(
+  "0" = "AECs", 
+  "1" = "nCD8+ TC",
+  "2" = "BC", 
+  "3" = "NK", 
+  "4" = "aCD8+ TC",
+  "5" = "iMac",
+  "6" = "AM",
+  "7" = "Neut", 
+  "8" = "aCD4+ TC",
+  "9" = "QECs",
+  "10" = "iMono",
+  "11" = "pCD8+ TC",
+  "12" = "ncMono",
+  "13" = "Fib", 
+  "14" = "cDC1s", 
+  "15" = "Aero",
+  "16" = "pDCs",
+  "17" = "RECs")
+
+names(truncated.cluster.ids) <- levels(integrated1)
+integrated1 <- RenameIdents(integrated1, truncated.cluster.ids)
+
+# Save the original cluster names
+original.cluster.names <- Idents(integrated1)
+
+# Assign numerical cluster identities for plotting
+integrated1 <- SetIdent(integrated1, value = numeric_cluster_ids)
+
+# Create a data frame for custom legend
+custom_legend <- data.frame(
+  cluster_number = as.numeric(names(truncated.cluster.ids)),
+  cluster_name = truncated.cluster.ids,
+  stringsAsFactors = FALSE)
+
+# UMAP plot
+umap1 <- DimPlot(integrated1, reduction = "umap", pt.size = 1, ncol = 4, label = TRUE, label.size = 5, repel = TRUE, split.by = "stim") +
+  scale_color_manual(
+    values = scales::hue_pal()(length(unique(integrated1@meta.data$seurat_clusters))),
+    labels = paste(custom_legend$cluster_number, ":", custom_legend$cluster_name)
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 5),ncol = 1)) +
+  theme(legend.text = element_text(size = 16, face = "bold"),
+        strip.text = element_text(size = 18, face = "bold"))
+
+# Restore the original cluster identities
+integrated1 <- SetIdent(integrated1, value = original.cluster.names)
+
+# Plot with custom legend
+print(umap1)
+```
+
+```{r}
+#SET DESIRED ORDER AND COLORS
+desired_order_long <- c(
+  "Angiogenic ECs", 
+  "Naive CD8+ T Cells",
+  "B Cells", 
+  "NK Cells", 
+  "Activated CD8+ T Cells",
+  "Infiltrating Macrophages",
+  "Alveolar Macrophages",
+  "Neutrophils", 
+  "Activated CD4+ T Cells",
+  "Quiescent ECs",
+  "Infiltrating Monocytes",
+  "Proliferating CD8⁺ T cells",
+  "Non-Classical Monocytes",
+  "Fibroblasts", 
+  "cDC1s", 
+  "Aerocytes",
+  "pDCs",
+  "Remodeling ECs")
+
+desired_order <- c(
+  "AECs", 
+  "nCD8+ TC",
+  "BC", 
+  "NK", 
+  "aCD8+ TC",
+  "iMac",
+  "AM",
+  "Neut", 
+  "aCD4+ TC",
+  "QECs",
+  "iMono",
+  "pCD8⁺ TC",
+  "ncMono",
+  "Fib", 
+  "cDC1s", 
+  "Aero",
+  "pDCs",
+  "RECs")
+
+cluster_colors_long <- c(
+  "Angiogenic ECs" = "#f8766d", 
+  "Naive CD8+ T Cells" = "#e88526",
+  "B Cells" = "#d39201", 
+  "NK Cells" = "#b79f00", 
+  "Activated CD8+ T Cells" = "#93aa00",
+  "Infiltrating Macrophages" = "#63b50d",
+  "Alveolar Macrophages" = "#00ba38",
+  "Neutrophils" = "#02bf74", 
+  "Activated CD4+ T Cells" = "#00c19f",
+  "Quiescent ECs" = "#01bfc4",
+  "Infiltrating Monocytes" = "#00b9e3",
+  "Proliferating CD8⁺ T cells" = "#00adfa",
+  "Non-Classical Monocytes" = "#609cff",
+  "Fibroblasts" = "#af87ff", 
+  "cDC1s" = "#db72fb", 
+  "Aerocytes" = "#f564e3",
+  "pDCs" = "#ff61c3",
+  "Remodeling ECs" = "#ff699c"
+			                         )
+
+cluster_colors <- c(
+  "AECs" = "#f8766d", 
+  "nCD8+ TC" = "#e88526",
+  "BC" = "#d39201", 
+  "NK" = "#b79f00", 
+  "aCD8+ TC" = "#93aa00",
+  "iMac" = "#63b50d",
+  "AM" = "#00ba38",
+  "Neut" = "#02bf74", 
+  "aCD4+ TC" = "#00c19f",
+  "QECs" = "#01bfc4",
+  "iMono" = "#00b9e3",
+  "pCD8⁺ TC" = "#00adfa",
+  "ncMono" = "#609cff",
+  "Fib" = "#af87ff", 
+  "cDC1s" = "#db72fb", 
+  "Aero" = "#f564e3",
+  "pDCs" = "#ff61c3",
+  "RECs" = "#ff699c"
+			                         )
+```
+
+####Figure 3B
+```{r}
+univADTfeatures <- c("Ms.CD45","HuMs.CD11b","Ms.CD31","Ms.CD19","Ms.CD3","Ms.CD86","Ms.Ly.6G","Ms.CD4","Ms.CD8b")
+
+DefaultAssay(integrated) <- "ADT"
+
+FeaturePlot(
+  integrated, 
+  features = univADTfeatures, 
+  max.cutoff = 75, 
+  ncol=3) &
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_blank(),
+    axis.text  = element_blank(),
+    axis.ticks = element_blank()
+  )
+```
+
+
+####Figure3C
+```{r}
+marker_genes <- c("Pecam1", "Vegfa", "Cd8a", "Lef1", "Cd19", "Cd79a", "Ncr1", "Klrd1", "Cd8b1", "Cd69", "Ccl2", "Fcgr1", "Siglecf", "Itgax", "Ly6g", "S100a8",
+"Icos", "Cd4", "Cdh5", "Cd34", "Cd14", "Vcan", "Mki67", "Ezh2", "Nr4a1", "Treml4", "Col1a1", "Sparc", "Alcam", "H2-Eb1", "Aqp1", "Plvap", "Siglech", "Tcf4", "Postn", "Epas1")
+```
+
+```{r}
+DefaultAssay(integrated) <- "RNA"
+integrated <- ScaleData(integrated, features = marker_genes)
+```
+
+```{r}
+DoHeatmap(integrated, features = marker_genes, size = 0, label = FALSE) +
+  scale_fill_gradientn(
+    colors = c("navy", "white", "firebrick3"),
+    name = "Z-Score"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.y = element_text(size = 12, face = "bold", color = "black"),
+    axis.text.x = element_blank(),
+    legend.title = element_text(face = "bold", size = 14, color = "black"),
+    legend.text = element_text(size = 12, color = "black", face = "bold"),
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )+
+  ggtitle("Marker Gene Expression Across Clusters")
+```
+
+####Figure 3D
+```{r}
+# Convert table to dataframe
+pt <- table(Idents(integrated), integrated$stim)
+pt <- as.data.frame(pt)
+
+# Rename columns for clarity
+colnames(pt) <- c("CellType", "Condition", "Count")
+
+# Ensure proper factor levels for desired order
+pt$CellType <- factor(pt$CellType, levels = desired_order)
+
+# Calculate percentages within each Condition
+pt <- pt %>%
+  group_by(Condition) %>%
+  mutate(Percentage = Count / sum(Count) * 100)
+
+# Create a separate pie chart for each condition with percentages
+condition_labels <- c("C57BL/6J+VEH" = "C57BL/6J+VEH",
+                      "C57BL/6J+SEB" = "C57BL/6J+SEB",
+                      "C3H/HeJ+VEH" = "C3H/HeJ+VEH",
+                      "C3H/HeJ+SEB" = "C3H/HeJ+SEB")
+
+ggplot(pt, aes(x = "", y = Percentage, fill = CellType)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y") +
+  facet_wrap(~Condition, ncol = 2, labeller = labeller(Condition = condition_labels)) +
+  theme_void() +
+  theme(
+    legend.position = "none", 
+    strip.text = element_text(face = "bold", size = 20, color = "black")
+  ) +
+  scale_fill_manual(values = cluster_colors)
+```
+
+
+####Figure 3E
+```{r}
+legend_df <- table(Idents(integrated), integrated$stim) %>%
+  as.data.frame() %>%
+  setNames(c("CellType", "Condition", "Count")) %>%
+  mutate(CellType = factor(CellType, levels = desired_order)) %>%
+  group_by(Condition) %>%
+  mutate(Percentage = Count / sum(Count) * 100) %>%
+  ungroup() %>%
+  mutate(
+    Condition = recode(Condition, "C57BL/6J+VEH" = "C57BL/6J+VEH",
+                      "C57BL/6J+SEB" = "C57BL/6J+SEB",
+                      "C3H/HeJ+VEH" = "C3H/HeJ+VEH",
+                      "C3H/HeJ+SEB" = "C3H/HeJ+SEB"),
+    Percentage = round(Percentage, 1)
+  ) %>%
+  select(CellType, Condition, Percentage)
+
+# Pivot to wide format and add colors
+legend_wide <- legend_df %>%
+  tidyr::pivot_wider(names_from = Condition, values_from = Percentage) %>%
+  mutate(Color = cluster_colors[as.character(CellType)]) %>%
+  relocate(Color, .before = CellType)
+
+# Generate GT Table
+legend_wide %>%
+  gt() %>%
+  text_transform(
+    locations = cells_body(columns = c(Color)),
+    fn = function(x) {
+      glue("<div style='background-color:{x};width:20px;height:20px;border-radius:3px'></div>")
+    }
+  ) %>%
+  cols_label(
+    Color = "",
+    CellType = "Cell Type",
+    `C57BL/6J+VEH` = "BL6+VEH %",
+    `C57BL/6J+SEB` = "BL6+SEB %",
+    `C3H/HeJ+VEH` = "C3H+VEH %",
+    `C3H/HeJ+SEB` = "C3H+SEB %"
+  ) %>%
+  cols_align(align = "left", columns = "CellType") %>%
+  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  # ✅ Center percentage columns
+  fmt_number(columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`), decimals = 1) %>%
+  opt_table_font(font = list(
+    google_font("Roboto"),
+    default_fonts()
+  )) %>%
+  tab_style(  # ✅ Bold the data cells
+    style = cell_text(weight = "bold"),
+    locations = cells_body()
+  ) %>%
+  tab_style( style = cell_text(weight = "bold"),
+    locations = cells_column_labels()) %>%
+  cols_width(
+  Color ~ px(30),
+  CellType ~ px(90),
+  `C57BL/6J+VEH` ~ px(100),
+  `C57BL/6J+SEB` ~ px(100),
+  `C3H/HeJ+VEH` ~ px(100),
+  `C3H/HeJ+SEB` ~ px(100)
+) %>%
+  tab_options(
+    table.font.size = px(16),
+    data_row.padding = px(2)
+  )
+```
+
+
+####Figure 3F
+```{r}
+#https://satijalab.org/seurat/articles/cell_cycle_vignette
+exp.mat <- read.table(file = "files/nestorawa_forcellcycle_expressionMatrix.txt",
+    header = TRUE, as.is = TRUE, row.names = 1)
+```
+
+```{r}
+# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+# segregate this list into markers of G2/M phase and markers of S phase
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+```
+
+```{r}
+library(gprofiler2)
+mmus_s = gorth(s.genes, source_organism = "hsapiens", target_organism = "mmusculus")$ortholog_name
+mmus_g2m = gorth(g2m.genes, source_organism = "hsapiens", target_organism = "mmusculus")$ortholog_name
+```
+
+```{r}
+integrated <- CellCycleScoring(integrated, s.features = mmus_s, g2m.features = mmus_g2m, set.ident = TRUE)
+```
+
+```{r}
+Idents(integrated) <- integrated$Phase
+```
+
+```{r}
+DimPlot(integrated, split.by = "stim", ncol = 2, pt.size = 1) &
+  theme(plot.title = element_text(size = 16, face = "bold"), 
+        strip.text = element_text(size = 14, face = "bold"),
+        legend.text  = element_text(size = 14,face = "bold"),  
+        legend.title = element_text(size = 14,face = "bold"),
+        axis.title = element_blank(),
+        axis.text = element_blank(), 
+        axis.ticks = element_blank(),
+        plot.margin = unit(c(6, 2, 2, 2), "pt")) &
+        plot_layout(guides = "collect")&
+        plot_annotation(
+        title = "Cell Cycle Scores",
+        theme = theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
+  )
+```
+
+
+##Figure 4
+
+####Figure 4A
+
+```{r}
+#loading unannotated RDS object
+cd3_pos <- readRDS(file = "files/cd3_pos.RDS")
+#numeric cluster names
+Idents(cd3_pos) <- cd3_pos$seurat_clusters
+numeric_cluster_ids <- Idents(cd3_pos)
+#annotate clusters
+new.cluster.ids <- c(
+  "0" = "nCD8+", 
+  "1" = "aCD8+",
+  "2" = "aCD4+", 
+  "3" = "CD4+ CM", 
+  "4" = "pCD8+",
+  "5" = "TCR Vβ8+ CD8+", 
+  "6" = "eCD8+"
+  )
+names(new.cluster.ids) <- levels(cd3_pos)
+cd3_pos <- RenameIdents(cd3_pos, new.cluster.ids)
+
+# Save the original cluster names
+original.cluster.names <- Idents(cd3_pos)
+
+# Assign numerical cluster identities for plotting
+cd3_pos <- SetIdent(cd3_pos, value = numeric_cluster_ids)
+
+# Create a data frame for custom legend
+custom_legend <- data.frame(
+  cluster_number = as.numeric(names(new.cluster.ids)),
+  cluster_name = new.cluster.ids,
+  stringsAsFactors = FALSE)
+
+# UMAP plot
+umap1 <- DimPlot(cd3_pos, reduction = "umap", split.by = "stim", pt.size = 1, ncol = 4, label = TRUE, label.size = 5, repel = TRUE) +
+  scale_color_manual(
+    values = scales::hue_pal()(length(unique(cd3_pos@meta.data$seurat_clusters))),
+    labels = paste(custom_legend$cluster_number, ":", custom_legend$cluster_name)
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 5),ncol = 1)) +
+  theme(legend.text = element_text(size = 16, face = "bold"),
+        strip.text = element_text(size = 18, face = "bold"))
+
+# Restore the original cluster identities
+cd3_pos <- SetIdent(cd3_pos, value = original.cluster.names)
+
+# Plot with custom legend
+print(umap1)
+```
+
+
+####Figure 4B
+```{r}
+TCellADT <- c("Ms.CD3","Ms.CD4","Ms.CD8b","Ms.TCR.Vb8.1-8.2","Ms.TCR.Vb5.1-5.2","Ms.CD25","HuMs.CD44","Ms.CD69")
+
+DefaultAssay(cd3_pos) <- "ADT"
+
+FeaturePlot(cd3_pos, 
+            features = TCellADT, 
+            max.cutoff = 75, 
+            ncol=2) &
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.title = element_blank(),
+    axis.text  = element_blank(),
+    axis.ticks = element_blank()
+  )
+```
+
+
+####Figure 4C
+```{r}
+FeaturePlot(cd3_pos, features = "Ms.TCR.Vb8.1-8.2", max.cutoff = 50, ncol = 2, split.by = "stim", pt.size = 1) &
+  theme(plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_blank(),
+    axis.text  = element_blank(),
+    axis.ticks = element_blank()
+  )
+```
+
+
+####Figre 4D.1
+```{r}
+#SET DESIRED ORDER AND COLORS
+desired_order <- c(
+"nCD8+", 
+"aCD8+",
+"aCD4+", 
+"CD4+ CM", 
+"pCD8+",
+"TCR Vβ8+ CD8+", 
+"eCD8+")
+
+cluster_colors <- c(
+"nCD8+" = "#f8766d", 
+"aCD8+" = "#c49a01",
+"aCD4+" = "#53b500", 
+"CD4+ CM" = "#02c094", 
+"pCD8+" = "#00b6eb",
+"TCR Vβ8+ CD8+" = "#a58aff",
+"eCD8+" = "#fb61d7")
+```
+
+```{r}
+#pie charts
+# Convert table to dataframe
+pt <- table(Idents(cd3_pos), cd3_pos$stim)
+pt <- as.data.frame(pt)
+
+# Rename columns for clarity
+colnames(pt) <- c("CellType", "Condition", "Count")
+
+# Ensure proper factor levels for desired order
+pt$CellType <- factor(pt$CellType, levels = desired_order)
+
+# Calculate percentages within each Condition
+pt <- pt %>%
+  group_by(Condition) %>%
+  mutate(Percentage = Count / sum(Count) * 100)
+
+# Create a separate pie chart for each condition with percentages
+condition_labels <- c("C57BL/6J+VEH" = "C57BL/6J+VEH",
+                      "C57BL/6J+SEB" = "C57BL/6J+SEB",
+                      "C3H/HeJ+VEH" = "C3H/HeJ+VEH",
+                      "C3H/HeJ+SEB" = "C3H/HeJ+SEB")
+
+ggplot(pt, aes(x = "", y = Percentage, fill = CellType)) +
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  coord_polar(theta = "y") +
+  facet_wrap(~Condition, ncol = 2, labeller = labeller(Condition = "C:\\Users\\cweyer\\OneDrive - USC School of Medicine\\Data\\SEB Project\\scRNA_CITE_TCR_seq\\condition_labels")) +
+  theme_void() +
+  theme(
+    legend.position = "none",  # ✅ Completely removes legend
+    strip.text = element_text(face = "bold", size = 20, color = "black")
+  ) +
+  scale_fill_manual(values = cluster_colors)
+```
+
+
+####Figure 4D.2
+```{r}
+legend_df <- table(Idents(cd3_pos), cd3_pos$stim) %>%
+  as.data.frame() %>%
+  setNames(c("CellType", "Condition", "Count")) %>%
+  mutate(CellType = factor(CellType, levels = desired_order)) %>%
+  group_by(Condition) %>%
+  mutate(Percentage = Count / sum(Count) * 100) %>%
+  ungroup() %>%
+  mutate(
+    Condition = recode(Condition, "C57BL/6J+VEH" = "C57BL/6J+VEH",
+                      "C57BL/6J+SEB" = "C57BL/6J+SEB",
+                      "C3H/HeJ+VEH" = "C3H/HeJ+VEH",
+                      "C3H/HeJ+SEB" = "C3H/HeJ+SEB"),
+    Percentage = round(Percentage, 1)
+  ) %>%
+  select(CellType, Condition, Percentage)
+
+# Pivot to wide format and add colors
+legend_wide <- legend_df %>%
+  pivot_wider(names_from = Condition, values_from = Percentage) %>%
+  mutate(Color = cluster_colors[as.character(CellType)]) %>%
+  relocate(Color, .before = CellType)
+
+# Generate GT Table
+legend_wide %>%
+  gt() %>%
+  text_transform(
+    locations = cells_body(columns = c(Color)),
+    fn = function(x) {
+      glue("<div style='background-color:{x};width:20px;height:20px;border-radius:3px'></div>")
+    }
+  ) %>%
+  cols_label(
+    Color = "",
+    CellType = "Cell Type",
+    `C57BL/6J+VEH` = "BL6+VEH %",
+    `C57BL/6J+SEB` = "BL6+SEB %",
+    `C3H/HeJ+VEH` = "C3H+VEH %",
+    `C3H/HeJ+SEB` = "C3H+SEB %"
+  ) %>%
+  cols_align(align = "left", columns = "CellType") %>%
+  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  # ✅ Center percentage columns
+  fmt_number(columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`), decimals = 1) %>%
+  opt_table_font(font = list(
+    google_font("Roboto"),
+    default_fonts()
+  )) %>%
+  tab_style(  # ✅ Bold the data cells
+    style = cell_text(weight = "bold"),
+    locations = cells_body()
+  ) %>%
+  tab_style( style = cell_text(weight = "bold"),
+    locations = cells_column_labels()) %>%
+  cols_width(
+  Color ~ px(30),
+  CellType ~ px(90),
+  `C57BL/6J+VEH` ~ px(100),
+  `C57BL/6J+SEB` ~ px(100),
+  `C3H/HeJ+VEH` ~ px(100),
+  `C3H/HeJ+SEB` ~ px(100)
+) %>%
+  tab_options(
+    table.font.size = px(16),
+    data_row.padding = px(2)
+  )
+```
+
+
+####Figure 4E
+
+```{r}
+# Ensure barcodes in vdj_all match those in cd3_pos
+vdj_filtered <- vdj_all[vdj_all$barcode %in% colnames(cd3_pos), ]
+
+# Count v_gene usage by sample_id
+v_gene_counts <- vdj_filtered %>%
+  group_by(sample_id, v_gene) %>%
+  tally() %>%
+  ungroup()
+
+# Select top 10 v_genes per stim
+top_v_genes <- v_gene_counts %>%
+  group_by(sample_id) %>%
+  slice_max(n = 5, order_by = n, with_ties = FALSE) %>%
+  pull(v_gene) %>%
+  unique()
+
+# Filter to top v_genes
+v_gene_counts_top <- v_gene_counts %>%
+  filter(v_gene %in% top_v_genes)
+
+# Reshape for heatmap
+heatmap_matrix <- v_gene_counts_top %>%
+  tidyr::pivot_wider(names_from = sample_id, values_from = n, values_fill = 0) %>%
+  as.data.frame()
+
+# Set v_gene as rownames
+rownames(heatmap_matrix) <- heatmap_matrix$v_gene
+heatmap_matrix$v_gene <- NULL
+
+heatmap_matrix <- select(heatmap_matrix, "BL6_VEH", "BL6_SEB", "C3H_VEH", "C3H_SEB")
+heatmap_matrix <- rename(heatmap_matrix, 
+                         "BL6+VEH" = "BL6_VEH", 
+                         "BL6+SEB" = "BL6_SEB", 
+                         "C3H+VEH" = "C3H_VEH", 
+                         "C3H+SEB" = "C3H_SEB")
+
+# Plot heatmap
+pheatmap::pheatmap(as.matrix(heatmap_matrix),
+                   cluster_rows = F,
+                   cluster_cols = F,
+                   color = colorRampPalette(c("white", "steelblue"))(100),
+                   main = "Top V Genes",
+                   fontsize = 16,                 # Increase font size
+                   fontsize_row = 14,             # Row (gene) labels
+                   fontsize_col = 14,             # Column (stim) labels
+                   angle_col = 0)
+
+```
+
+####Figure 4F
+```{r}
+# Define Vβ8 family gene names
+vb8_genes <- c("TRBV13-1","TRBV13-2","TRBV13-3")
+
+# Detect TRBV13-x even in combined v_gene strings
+vdj_all$TRBV13_subfamily <- sapply(vdj_all$v_gene, function(v) {
+  any(sapply(vb8_genes, function(target) grepl(target, v)))
+})
+
+# Merge with Seurat metadata
+# Create a named vector from vdj_all$TRBV13_subfamily with barcodes as names
+TRBV13_vec <- setNames(vdj_all$TRBV13_subfamily, vdj_all$barcode)
+
+# Subset to common barcodes
+common_barcodes <- intersect(Cells(cd3_pos), names(TRBV13_vec))
+
+# Assign using named vector indexing
+cd3_pos$TRBV13_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV13_subfamily[common_barcodes] <- TRBV13_vec[common_barcodes]
+
+# Convert remaining NAs to FALSE
+cd3_pos$TRBV13_subfamily[is.na(cd3_pos$TRBV13_subfamily)] <- FALSE
+```
+
+
+```{r}
+# Plot UMAP
+DimPlot(cd3_pos, group.by = "TRBV13_subfamily", 
+        split.by = "stim",
+        cols = c("gray", "red"), 
+        pt.size = 1) +
+  ggtitle("Cells Expressing TRBV13-1/2/3") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.text = element_text(face = "bold"),
+    legend.title = element_text(face = "bold")
+  )
+
+```
+
+####Figure 4G
+```{r}
+# Define Vβ8 family gene names
+vb3_genes <- c("TRBV26")
+
+# Detect TRBV13-x even in combined v_gene strings
+vdj_all$TRBV26_subfamily <- sapply(vdj_all$v_gene, function(v) {
+  any(sapply(vb3_genes, function(target) grepl(target, v)))
+})
+
+# Merge with Seurat metadata
+# Create a named vector from vdj_all$TRBV26_subfamily with barcodes as names
+TRBV26_vec <- setNames(vdj_all$TRBV26_subfamily, vdj_all$barcode)
+
+# Subset to common barcodes
+common_barcodes <- intersect(Cells(cd3_pos), names(TRBV26_vec))
+
+# Assign using named vector indexing
+cd3_pos$TRBV26_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV26_subfamily[common_barcodes] <- TRBV26_vec[common_barcodes]
+
+# Convert remaining NAs to FALSE
+cd3_pos$TRBV26_subfamily[is.na(cd3_pos$TRBV26_subfamily)] <- FALSE
+```
+
+
+```{r}
+# Plot UMAP
+DimPlot(cd3_pos, group.by = "TRBV26_subfamily", 
+        split.by = "stim",
+        cols = c("gray", "red"), 
+        pt.size = 1) +
+  ggtitle("Cells Expressing TRBV13-1/2/3") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.text = element_text(face = "bold"),
+    legend.title = element_text(face = "bold")
+  )
+
+```
+
+####Figure 4H
+```{r}
+# Define Vβ8 family gene names
+vb7_genes <- c("TRBV29")
+
+# Detect TRBV13-x even in combined v_gene strings
+vdj_all$TRBV29_subfamily <- sapply(vdj_all$v_gene, function(v) {
+  any(sapply(vb7_genes, function(target) grepl(target, v)))
+})
+
+# Merge with Seurat metadata
+# Create a named vector from vdj_all$TRBV29_subfamily with barcodes as names
+TRBV29_vec <- setNames(vdj_all$TRBV29_subfamily, vdj_all$barcode)
+
+# Subset to common barcodes
+common_barcodes <- intersect(Cells(cd3_pos), names(TRBV29_vec))
+
+# Assign using named vector indexing
+cd3_pos$TRBV29_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV29_subfamily[common_barcodes] <- TRBV29_vec[common_barcodes]
+
+# Convert remaining NAs to FALSE
+cd3_pos$TRBV29_subfamily[is.na(cd3_pos$TRBV29_subfamily)] <- FALSE
+```
+
+
+```{r}
+# Plot UMAP
+DimPlot(cd3_pos, group.by = "TRBV29_subfamily", 
+        split.by = "stim",
+        cols = c("gray", "red"), 
+        pt.size = 1) +
+  ggtitle("Cells Expressing TRBV13-1/2/3") +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.text = element_text(face = "bold"),
+    legend.title = element_text(face = "bold")
+  )
+
+```

@@ -1,0 +1,530 @@
+---
+title: "SEB Manuscript Code"
+author: "Chloe Weyer-Nichols"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(verbose = FALSE, message = FALSE, warning = FALSE)
+```
+# H2 Haplotype Determines Susceptibility to Superantigen-Induced Acute Lung Injury 
+## Authors: Chloe E. Weyer-Nichols1, Taylor H. Carter1, Kiesha M. Wilson1, Prakash Nagarkatti1, Mitzi Nagarkatti1*
+### Institutions: 1Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
+### Corresponding Author: Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
+##Manuscript Code for Reproducibility
+###Loading Required Libraries
+```{r}
+library(Seurat)
+library(dplyr) 
+library(patchwork)
+library(readr) 
+library("data.table") 
+library(knitr)
+library(ggplot2)
+library(DoubletFinder)
+library(ggrepel)
+library(tidyr)
+library(gt)
+library(glue)
+library(glmGamPoi)
+```
+
+
+###LOAD DATA
+```{r}
+BL6_VEHgz <- Seurat::Read10X("BL6_VEH_sample_sample_filtered_feature_bc_matrix", gene.column = 2, cell.column = 1, unique.features = TRUE,strip.suffix = FALSE)
+BL6_SEBgz <- Seurat::Read10X("BL6_SEB_sample_filtered_feature_bc_matrix",gene.column = 2,cell.column = 1,unique.features = TRUE,strip.suffix = FALSE)
+C3H_VEHgz <- Seurat::Read10X("C3H_VEH_sample_filtered_feature_bc_matrix", gene.column = 2, cell.column = 1, unique.features = TRUE,strip.suffix = FALSE)
+C3H_SEBgz <- Seurat::Read10X("C3H_SEB_sample_filtered_feature_bc_matrix",gene.column = 2,cell.column = 1,unique.features = TRUE,strip.suffix = FALSE)
+```
+
+
+###CREATE OBJECTS
+```{r}
+BL6_VEH <- Seurat::CreateSeuratObject(counts = BL6_VEHgz[["Gene Expression"]], project = "triseq", min.cells = 5)
+BL6_VEH[["ADT"]] <- Seurat::CreateAssayObject(counts = BL6_VEHgz[["Antibody Capture"]])
+BL6_VEH$stim <- "BL6_VEH"
+# store mitochondrial percentage in object meta data
+BL6_VEH <- Seurat::PercentageFeatureSet(BL6_VEH, pattern = "^mt-", col.name = "percent.mt")
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_VEH,"BL6_VEH_RAW.RDS")
+```
+
+```{r}
+BL6_SEB <- Seurat::CreateSeuratObject(counts = BL6_SEBgz[["Gene Expression"]], project = "triseq", min.cells = 5)
+BL6_SEB[["ADT"]] <- Seurat::CreateAssayObject(counts = BL6_SEBgz[["Antibody Capture"]])
+BL6_SEB$stim <- "BL6_SEB"
+# store mitochondrial percentage in object meta data
+BL6_SEB <- Seurat::PercentageFeatureSet(BL6_SEB, pattern = "^mt-", col.name = "percent.mt")
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_SEB,"BL6_SEB_RAW.RDS")
+```
+
+```{r}
+C3H_VEH <- Seurat::CreateSeuratObject(counts = C3H_VEHgz[["Gene Expression"]], project = "triseq", min.cells = 5)
+C3H_VEH[["ADT"]] <- Seurat::CreateAssayObject(counts = C3H_VEHgz[["Antibody Capture"]])
+C3H_VEH$stim <- "C3H_VEH"
+# store mitochondrial percentage in object meta data
+C3H_VEH <- Seurat::PercentageFeatureSet(C3H_VEH, pattern = "^mt-", col.name = "percent.mt")
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_VEH,"C3H_VEH_RAW.RDS")
+```
+
+```{r}
+C3H_SEB <- Seurat::CreateSeuratObject(counts = C3H_SEBgz[["Gene Expression"]], project = "triseq", min.cells = 5)
+C3H_SEB[["ADT"]] <- Seurat::CreateAssayObject(counts = C3H_SEBgz[["Antibody Capture"]])
+C3H_SEB$stim <- "C3H_SEBgz"
+# store mitochondrial percentage in object meta data
+C3H_SEB <- Seurat::PercentageFeatureSet(C3H_SEB, pattern = "^mt-", col.name = "percent.mt")
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_SEB,"C3H_SEB_RAW.RDS")
+```
+
+
+###FILTERING
+```{r}
+VlnPlot(BL6_VEH, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+VlnPlot(BL6_SEB, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+VlnPlot(C3H_VEH, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+VlnPlot(C3H_SEB, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+```
+
+```{r}
+BL6_VEH <- subset(BL6_VEH, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
+BL6_SEB <- subset(BL6_SEB, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
+C3H_VEH <- subset(C3H_VEH, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
+C3H_SEB <- subset(C3H_SEB, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & percent.mt < 5)
+```
+
+
+###PRELIMINARY CLUSTERING FOR DOUBLET FINDER INPUT
+```{r}
+BL6_VEH <- NormalizeData(BL6_VEH, verbose = FALSE)
+BL6_VEH <- FindVariableFeatures(BL6_VEH, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(BL6_VEH)
+BL6_VEH <- ScaleData(BL6_VEH, features = all.genes)
+BL6_VEH <- RunPCA(BL6_VEH, features = VariableFeatures(object = BL6_VEH))
+ElbowPlot(BL6_VEH)
+BL6_VEH <- FindNeighbors(BL6_VEH, dims = 1:30)
+BL6_VEH <- FindClusters(BL6_VEH, resolution = 0.5)
+BL6_VEH <- RunUMAP(BL6_VEH, dims = 1:30)
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_VEH,"BL6_VEH_preDF.RDS")
+```
+
+```{r}
+BL6_SEB <- NormalizeData(BL6_SEB, verbose = FALSE)
+BL6_SEB <- FindVariableFeatures(BL6_SEB, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(BL6_SEB)
+BL6_SEB <- ScaleData(BL6_SEB, features = all.genes)
+BL6_SEB <- RunPCA(BL6_SEB, features = VariableFeatures(object = BL6_SEB))
+ElbowPlot(BL6_SEB)
+BL6_SEB <- FindNeighbors(BL6_SEB, dims = 1:30)
+BL6_SEB <- FindClusters(BL6_SEB, resolution = 0.5)
+BL6_SEB <- RunUMAP(BL6_SEB, dims = 1:30)
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_SEB,"BL6_SEB_preDF.RDS")
+```
+
+```{r}
+C3H_VEH <- NormalizeData(C3H_VEH, verbose = FALSE)
+C3H_VEH <- FindVariableFeatures(C3H_VEH, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(C3H_VEH)
+C3H_VEH <- ScaleData(C3H_VEH, features = all.genes)
+C3H_VEH <- RunPCA(C3H_VEH, features = VariableFeatures(object = C3H_VEH))
+ElbowPlot(C3H_VEH)
+C3H_VEH <- FindNeighbors(C3H_VEH, dims = 1:30)
+C3H_VEH <- FindClusters(C3H_VEH, resolution = 0.5)
+C3H_VEH <- RunUMAP(C3H_VEH, dims = 1:30)
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_VEH,"C3H_VEH_preDF.RDS")
+```
+
+```{r}
+C3H_SEB <- NormalizeData(C3H_SEB, verbose = FALSE)
+C3H_SEB <- FindVariableFeatures(C3H_SEB, selection.method = "vst", nfeatures = 2000)
+all.genes <- rownames(C3H_SEB)
+C3H_SEB <- ScaleData(C3H_SEB, features = all.genes)
+C3H_SEB <- RunPCA(C3H_SEB, features = VariableFeatures(object = C3H_SEB))
+ElbowPlot(C3H_SEB)
+C3H_SEB <- FindNeighbors(C3H_SEB, dims = 1:30)
+C3H_SEB <- FindClusters(C3H_SEB, resolution = 0.5)
+C3H_SEB <- RunUMAP(C3H_SEB, dims = 1:30)
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_SEB,"C3H_SEB_preDF.RDS")
+```
+
+
+###DOUBLET FINDER
+```{r}
+#pK Identification (no ground-truth)
+sweep.res.list_BL6_VEH <- paramSweep(BL6_VEH, PCs = 1:30, sct = FALSE)
+sweep.stats_BL6_VEH <- summarizeSweep(sweep.res.list_BL6_VEH, GT = FALSE)
+bcmvn_BL6_VEH <- find.pK(sweep.stats_BL6_VEH)
+bcmvn_plot <- ggplot(bcmvn_BL6_VEH, aes(x = pK, y = BCmetric)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "BCmvn vs pK",
+  x = "pK",
+  y = "BCmvn")
+print(bcmvn_plot) #ideal pK is the one with the highest AUC, in this case 0.02
+```
+
+```{r}
+annotations <- Idents(BL6_VEH)
+homotypic.prop <- modelHomotypic(annotations) 
+print(homotypic.prop)
+```
+
+```{r}
+nExp_poi <- round(0.016*nrow(BL6_VEH@meta.data))  #assume 1.6% doublets according to 10x
+nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+```
+
+```{r}
+#Run doublet finder to determine optimal settings
+BL6_VEH <- doubletFinder(BL6_VEH, PCs = 1:30, pN = 0.25, pK = 0.02, nExp = nExp_poi, reuse.pANN = FALSE, sct = FALSE)
+```
+
+```{r}
+DimPlot(BL6_VEH, group.by = "DF.classifications_0.25_0.02_25")
+```
+
+```{r}
+BL6_VEH_singlets <- subset(BL6_VEH, cells = which(BL6_VEH@meta.data[["DF.classifications_0.25_0.02_25"]] == "Singlet"))
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_VEH_singlets, "BL6_VEH_singlets.RDS")
+```
+
+```{r}
+#pK Identification (no ground-truth)
+sweep.res.list_BL6_SEB <- paramSweep(BL6_SEB, PCs = 1:30, sct = FALSE)
+sweep.stats_BL6_SEB <- summarizeSweep(sweep.res.list_BL6_SEB, GT = FALSE)
+bcmvn_BL6_SEB <- find.pK(sweep.stats_BL6_SEB)
+bcmvn_plot <- ggplot(bcmvn_BL6_SEB, aes(x = pK, y = BCmetric)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "BCmvn vs pK",
+  x = "pK",
+  y = "BCmvn")
+print(bcmvn_plot) #ideal pK is the one with the highest AUC, in this case 0.11
+```
+
+```{r}
+annotations <- Idents(BL6_SEB)
+homotypic.prop <- modelHomotypic(annotations) 
+print(homotypic.prop)
+```
+
+```{r}
+nExp_poi <- round(0.016*nrow(BL6_SEB@meta.data))  #assume 1.6% doublets according to 10x
+nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+```
+
+```{r}
+#Run doublet finder to determine optimal settings
+BL6_SEB <- doubletFinder(BL6_SEB, PCs = 1:30, pN = 0.25, pK = 0.11, nExp = nExp_poi, reuse.pANN = FALSE, sct = FALSE)
+```
+
+```{r}
+DimPlot(BL6_SEB, group.by = "DF.classifications_0.25_0.11_19")
+```
+
+```{r}
+BL6_SEB_singlets <- subset(BL6_SEB, cells = which(BL6_SEB@meta.data[["DF.classifications_0.25_0.11_19"]] == "Singlet"))
+```
+
+```{r, eval=FALSE}
+saveRDS(BL6_SEB_singlets, "BL6_SEB_singlets.RDS")
+```
+
+```{r}
+#pK Identification (no ground-truth)
+sweep.res.list_C3H_VEH <- paramSweep(C3H_VEH, PCs = 1:30, sct = FALSE)
+sweep.stats_C3H_VEH <- summarizeSweep(sweep.res.list_C3H_VEH, GT = FALSE)
+bcmvn_C3H_VEH <- find.pK(sweep.stats_C3H_VEH)
+bcmvn_plot <- ggplot(bcmvn_C3H_VEH, aes(x = pK, y = BCmetric)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "BCmvn vs pK",
+  x = "pK",
+  y = "BCmvn")
+print(bcmvn_plot) #ideal pK is the one with the highest AUC, in this case 0.15
+```
+
+```{r}
+annotations <- Idents(C3H_VEH)
+homotypic.prop <- modelHomotypic(annotations) 
+print(homotypic.prop)
+```
+
+```{r}
+nExp_poi <- round(0.016*nrow(C3H_VEH@meta.data))  #assume 1.6% doublets according to 10x
+nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+```
+
+```{r}
+#Run doublet finder to determine optimal settings
+C3H_VEH <- doubletFinder(C3H_VEH, PCs = 1:30, pN = 0.25, pK = 0.15, nExp = nExp_poi, reuse.pANN = FALSE, sct = FALSE)
+```
+
+```{r}
+DimPlot(C3H_VEH, group.by = "DF.classifications_0.25_0.15_11")
+```
+
+```{r}
+C3H_VEH_singlets <- subset(C3H_VEH, cells = which(C3H_VEH@meta.data[["DF.classifications_0.25_0.15_11"]] == "Singlet"))
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_VEH_singlets, "C3H_VEH_singlets.RDS")
+```
+
+```{r}
+#pK Identification (no ground-truth)
+sweep.res.list_C3H_SEB <- paramSweep(C3H_SEB, PCs = 1:30, sct = FALSE)
+sweep.stats_C3H_SEB <- summarizeSweep(sweep.res.list_C3H_SEB, GT = FALSE)
+bcmvn_C3H_SEB <- find.pK(sweep.stats_C3H_SEB)
+bcmvn_plot <- ggplot(bcmvn_C3H_SEB, aes(x = pK, y = BCmetric)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "BCmvn vs pK",
+  x = "pK",
+  y = "BCmvn")
+print(bcmvn_plot) #ideal pK is the one with the highest AUC, in this case 0.16
+```
+
+```{r}
+annotations <- Idents(C3H_SEB)
+homotypic.prop <- modelHomotypic(annotations) 
+print(homotypic.prop)
+```
+
+```{r}
+nExp_poi <- round(0.016*nrow(C3H_SEB@meta.data))  #assume 1.6% doublets according to 10x
+nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+```
+
+```{r}
+#Run doublet finder to determine optimal settings
+C3H_SEB <- doubletFinder(C3H_SEB, PCs = 1:30, pN = 0.25, pK = 0.16, nExp = nExp_poi, reuse.pANN = FALSE, sct = FALSE)
+```
+
+```{r}
+DimPlot(C3H_SEB, group.by = "DF.classifications_0.25_0.16_24")
+```
+
+```{r}
+C3H_SEB_singlets <- subset(C3H_SEB, cells = which(C3H_SEB@meta.data[["DF.classifications_0.25_0.16_24"]] == "Singlet"))
+```
+
+```{r, eval=FALSE}
+saveRDS(C3H_SEB_singlets, "C3H_SEB_singlets.RDS")
+```
+
+
+###CONFIGURE VDJ INFORMATION
+```{r}
+BV_VDJ <- read.csv("BL6_VEH_filtered_contig_annotations.csv")
+BS_VDJ <- read.csv("BL6_SEB_filtered_contig_annotations.csv")
+CV_VDJ <- read.csv("C3H_VEH_filtered_contig_annotations.csv")
+CS_VDJ <- read.csv("C3H_SEB_filtered_contig_annotations.csv")
+```
+
+```{r}
+process_vdj <- function(vdj, sample_id) {
+  vdj %>%
+    filter(productive == "true") %>%
+    group_by(barcode) %>%
+    summarize(
+      clonotype_id = unique(raw_clonotype_id)[1],
+      TRA = paste(cdr3[chain == "TRA"], collapse = ";"),
+      TRB = paste(cdr3[chain == "TRB"], collapse = ";"),
+      cdr3 = paste(cdr3, collapse = ";"),
+      cdr3_nt = paste(cdr3_nt, collapse = ";"),
+      v_gene = paste(v_gene, collapse = ";")
+    ) %>%
+    mutate(
+      sample_id = sample_id
+    )
+}
+
+# Process each dataset
+BV_summary <- process_vdj(BV_VDJ, "BL6_VEH")
+BS_summary <- process_vdj(BS_VDJ, "BL6_SEB")
+CV_summary <- process_vdj(CV_VDJ, "C3H_VEH")
+CS_summary <- process_vdj(CS_VDJ, "C3H_SEB")
+
+# Combine
+vdj_all <- bind_rows(BV_summary, BS_summary, CV_summary, CS_summary)
+
+# Add prefixed barcode
+vdj_all$barcode <- paste0(vdj_all$sample_id, "_", vdj_all$barcode)
+rownames(vdj_all) <- vdj_all$barcode
+
+saveRDS(vdj_all, file = "vdj_all.RDS")
+```
+
+```{r}
+#make barcodes same in seurat object
+seurat_list <- list(
+ BL6_VEH = BL6_VEH,
+ BL6_SEB = BL6_SEB,
+ C3H_VEH = C3H_VEH,
+ C3H_SEB = C3H_SEB
+)
+
+for (name in names(seurat_list)) {
+  colnames(seurat_list[[name]]) <- paste0(name, "_", colnames(seurat_list[[name]]))
+  seurat_list[[name]]$sample_id <- name
+}
+```
+
+```{r}
+#add VDJ info to seurat objects
+
+for (sample in names(seurat_list)) {
+  seurat <- seurat_list[[sample]]
+  
+  # Add empty columns if they don't already exist
+  seurat$clonotype_id <- NA
+  seurat$TCRa_cdr3 <- NA
+  seurat$TCRb_cdr3 <- NA
+  
+  seurat_list[[sample]] <- seurat
+}
+
+for (sample in names(seurat_list)) {
+  seurat <- seurat_list[[sample]]
+  
+  # Find matching barcodes
+  common <- intersect(rownames(seurat@meta.data), vdj_all$barcode)
+  
+  # Add metadata — using rownames as index
+  seurat@meta.data[common, "clonotype_id"] <- vdj_all[common, "clonotype_id"]
+  seurat@meta.data[common, "TCRa_cdr3"] <- vdj_all[common, "TRA"]
+  seurat@meta.data[common, "TCRb_cdr3"] <- vdj_all[common, "TRB"]
+  
+  # Save back into list
+  seurat_list[[sample]] <- seurat
+}
+```
+
+###INTEGRATE 
+```{r}
+for (i in names(seurat_list)) {
+  seurat_list[[i]] <- FindVariableFeatures(seurat_list[[i]], selection.method = "vst", nfeatures = 2000)
+}
+features <- SelectIntegrationFeatures(object.list = seurat_list)
+anchors <- FindIntegrationAnchors(object.list = seurat_list, anchor.features = features)
+integrated <- IntegrateData(anchorset = anchors)
+```
+
+```{r}
+DefaultAssay(integrated) <- "integrated"
+
+integrated <- ScaleData(integrated)
+integrated <- RunPCA(integrated)
+integrated <- RunUMAP(integrated, dims = 1:30)
+integrated <- FindNeighbors(integrated, dims = 1:30)
+integrated <- FindClusters(integrated, resolution = 0.8)
+```
+
+```{r}
+DimPlot(integrated, group.by = "stim")  # if added
+table(integrated$stim)
+```
+
+```{r}
+integrated$stim <- recode(integrated$stim,
+                          "BL6_VEH" = "C57BL/6J+VEH",
+                          "BL6_SEB" = "C57BL/6J+SEB",
+                          "C3H_VEH" = "C3H/HeJ+VEH",
+                          "C3H_SEBgz" = "C3H/HeJ+SEB")
+
+# Convert to factor and set the desired order
+integrated$stim <- factor(integrated$stim, levels = c("C57BL/6J+VEH",
+                                                      "C57BL/6J+SEB",
+                                                      "C3H/HeJ+VEH",
+                                                      "C3H/HeJ+SEB"))
+```
+
+```{r, eval=FALSE}
+saveRDS(integrated, "integrated.RDS")
+```
+
+
+###CD3+ Object
+```{r}
+#subset T cells for new object
+DefaultAssay(integrated) <- "RNA"
+cd3_pos <- subset(integrated, subset = Cd3e > 0.5)
+saveRDS(cd3_pos, "cd3_pos.RDS")
+```
+
+```{r}
+DefaultAssay(cd3_pos) <- "integrated"
+
+cd3_pos <- ScaleData(cd3_pos)
+cd3_pos <- RunPCA(cd3_pos)
+cd3_pos <- RunUMAP(cd3_pos, dims = 1:30)
+cd3_pos <- FindNeighbors(cd3_pos, dims = 1:30)
+cd3_pos <- FindClusters(cd3_pos, resolution = 0.8)
+saveRDS(cd3_pos, "cd3_pos.RDS")
+```
+
+```{r}
+DimPlot(cd3_pos, label = T, split.by = "stim")
+```
+ 
+```{r}
+#finding markers for each cluster
+DefaultAssay(cd3_pos) <- "ADT"
+cd3_pos.markersADT <- FindAllMarkers(cd3_pos, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+cd3_pos.markersADT %>%
+    group_by(cluster) %>%
+    slice_max(n = 2, order_by = avg_log2FC)
+```
+
+```{r}
+write.csv(cd3_pos.markersADT, "cd3_posADT_cluster_markers.csv")
+```
+
+```{r}
+#finding markers for each cluster
+DefaultAssay(cd3_pos) <- "RNA"
+cd3_pos.markersADT <- FindAllMarkers(cd3_pos, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+cd3_pos.markersADT %>%
+    group_by(cluster) %>%
+    slice_max(n = 2, order_by = avg_log2FC)
+```
+
+```{r}
+write.csv(cd3_pos.markersADT, "cd3_pos_cluster_markers.csv")
+```
+

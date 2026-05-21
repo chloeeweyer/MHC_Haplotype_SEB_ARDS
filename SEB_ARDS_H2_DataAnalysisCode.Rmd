@@ -501,10 +501,39 @@ integrated$stim <- factor(integrated$stim, levels = c("C57BL/6J+VEH",
                                                       "C3H/HeJ+SEB"))
 ```
 
+```{r}
+JoinLayers(integrated, layers = c("data","counts","scale.data"))
+```
+
 ```{r, eval=FALSE}
 saveRDS(integrated, "integrated.RDS")
 ```
 
+```{r}
+#finding markers for each cluster
+DefaultAssay(integrated) <- "RNA"
+integrated.markersRNA <- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+integrated.markersRNA %>%
+    group_by(cluster) %>%
+    slice_max(n = 2, order_by = avg_log2FC)
+```
+
+```{r}
+write.csv(integrated.markersRNA, "integrated_posRNA_cluster_markers.csv")
+```
+
+```{r}
+#finding markers for each cluster
+DefaultAssay(integrated) <- "ADT"
+integrated.markersADT <- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+integrated.markersADT %>%
+    group_by(cluster) %>%
+    slice_max(n = 2, order_by = avg_log2FC)
+```
+
+```{r}
+write.csv(integrated.markersADT, "integrated_posADT_cluster_markers.csv")
+```
 
 ## CD3+ T CELL SUBSET
 ```{r}

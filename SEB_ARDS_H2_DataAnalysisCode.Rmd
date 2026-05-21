@@ -1,21 +1,43 @@
 ---
-title: "SEB Manuscript Code"
+title: "SEB ARDS H2 Manuscript QC Code"
 author: "Chloe Weyer-Nichols"
 output:
+  html_document:
+    toc: true
+    toc_float: true
   pdf_document: default
-  html_document: default
 editor_options:
   chunk_output_type: console
 ---
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(verbose = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(
+  eval = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
 ```
+
 # H2 Haplotype Determines Susceptibility to Superantigen-Induced Acute Lung Injury 
-## Authors: Chloe E. Weyer-Nichols1, Taylor H. Carter1, Kiesha M. Wilson1, Prakash Nagarkatti1, Mitzi Nagarkatti1*
-### Institutions: 1Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
-### Corresponding Author: Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
-##Manuscript Code for Reproducibility
-###Loading Required Libraries
+## Authors: Chloe E. Weyer-Nichols^1^, Taylor H. Carter^1^, Kiesha M. Wilson^1^, Prakash Nagarkatti^1^, Mitzi Nagarkatti^1*^
+### Institutions: ^1^Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
+### Corresponding Author: ^*^Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
+Data Analysis/Quality Control Code for Reproducibility
+
+**Note:** The processed Seurat objects and V(D)J table used for downstream analysis are available through the associated data repository. These include:
+
+- `integrated.RDS`: integrated Seurat object containing all cells across conditions
+- `cd3_pos.RDS`: CD3e+ T cell subset generated from the integrated object
+- `vdj_all.RDS`: combined V(D)J annotation table
+
+The code below documents the full analysis workflow beginning with the raw Cell Ranger outputs, but users may begin from the processed RDS files for downstream visualization and analysis.
+
+```{r}
+set.seed(0311)
+```
+
+
+## LOAD LIBRARIES 
 ```{r}
 library(Seurat)
 library(dplyr) 
@@ -33,7 +55,7 @@ library(glmGamPoi)
 ```
 
 
-###LOAD DATA
+## LOAD DATA
 ```{r}
 BL6_VEHgz <- Seurat::Read10X("BL6_VEH_sample_sample_filtered_feature_bc_matrix", gene.column = 2, cell.column = 1, unique.features = TRUE,strip.suffix = FALSE)
 BL6_SEBgz <- Seurat::Read10X("BL6_SEB_sample_filtered_feature_bc_matrix",gene.column = 2,cell.column = 1,unique.features = TRUE,strip.suffix = FALSE)
@@ -42,7 +64,7 @@ C3H_SEBgz <- Seurat::Read10X("C3H_SEB_sample_filtered_feature_bc_matrix",gene.co
 ```
 
 
-###CREATE OBJECTS
+## CREATE SEURAT OBJECTS
 ```{r}
 BL6_VEH <- Seurat::CreateSeuratObject(counts = BL6_VEHgz[["Gene Expression"]], project = "triseq", min.cells = 5)
 BL6_VEH[["ADT"]] <- Seurat::CreateAssayObject(counts = BL6_VEHgz[["Antibody Capture"]])
@@ -82,7 +104,7 @@ saveRDS(C3H_VEH,"C3H_VEH_RAW.RDS")
 ```{r}
 C3H_SEB <- Seurat::CreateSeuratObject(counts = C3H_SEBgz[["Gene Expression"]], project = "triseq", min.cells = 5)
 C3H_SEB[["ADT"]] <- Seurat::CreateAssayObject(counts = C3H_SEBgz[["Antibody Capture"]])
-C3H_SEB$stim <- "C3H_SEBgz"
+C3H_SEB$stim <- "C3H_SEB"
 # store mitochondrial percentage in object meta data
 C3H_SEB <- Seurat::PercentageFeatureSet(C3H_SEB, pattern = "^mt-", col.name = "percent.mt")
 ```
@@ -92,7 +114,7 @@ saveRDS(C3H_SEB,"C3H_SEB_RAW.RDS")
 ```
 
 
-###FILTERING
+## QUALITY CONTROL
 ```{r}
 VlnPlot(BL6_VEH, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 VlnPlot(BL6_SEB, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
@@ -108,7 +130,7 @@ C3H_SEB <- subset(C3H_SEB, subset = nFeature_RNA > 200 & nFeature_RNA < 5000 & p
 ```
 
 
-###PRELIMINARY CLUSTERING FOR DOUBLET FINDER INPUT
+## PRELIMINARY CLUSTERING FOR DOUBLET FINDER INPUT
 ```{r}
 BL6_VEH <- NormalizeData(BL6_VEH, verbose = FALSE)
 BL6_VEH <- FindVariableFeatures(BL6_VEH, selection.method = "vst", nfeatures = 2000)
@@ -174,7 +196,7 @@ saveRDS(C3H_SEB,"C3H_SEB_preDF.RDS")
 ```
 
 
-###DOUBLET FINDER
+## DOUBLET FINDER PREPROCESSING
 ```{r}
 #pK Identification (no ground-truth)
 sweep.res.list_BL6_VEH <- paramSweep(BL6_VEH, PCs = 1:30, sct = FALSE)
@@ -348,7 +370,7 @@ saveRDS(C3H_SEB_singlets, "C3H_SEB_singlets.RDS")
 ```
 
 
-###CONFIGURE VDJ INFORMATION
+## CONFIGURE V(D)J INFORMATION
 ```{r}
 BV_VDJ <- read.csv("BL6_VEH_filtered_contig_annotations.csv")
 BS_VDJ <- read.csv("BL6_SEB_filtered_contig_annotations.csv")
@@ -357,9 +379,13 @@ CS_VDJ <- read.csv("C3H_SEB_filtered_contig_annotations.csv")
 ```
 
 ```{r}
+# Retain productive TCR contigs for downstream TCR metadata annotation and V gene/CDR3 analysis.
+# Nonproductive contigs are excluded because they are not expected to encode functional TCR chains.
+# Productive TRA and TRB chains are collapsed at the barcode level to preserve cells with multiple detected chains.
+
 process_vdj <- function(vdj, sample_id) {
   vdj %>%
-    filter(productive == "true") %>%
+    filter(tolower(as.character(productive)) == "true") %>%
     group_by(barcode) %>%
     summarize(
       clonotype_id = unique(raw_clonotype_id)[1],
@@ -393,10 +419,10 @@ saveRDS(vdj_all, file = "vdj_all.RDS")
 ```{r}
 #make barcodes same in seurat object
 seurat_list <- list(
- BL6_VEH = BL6_VEH,
- BL6_SEB = BL6_SEB,
- C3H_VEH = C3H_VEH,
- C3H_SEB = C3H_SEB
+ BL6_VEH = BL6_VEH_singlets,
+ BL6_SEB = BL6_SEB_singlets,
+ C3H_VEH = C3H_VEH_singlets,
+ C3H_SEB = C3H_SEB_singlets
 )
 
 for (name in names(seurat_list)) {
@@ -425,7 +451,7 @@ for (sample in names(seurat_list)) {
   # Find matching barcodes
   common <- intersect(rownames(seurat@meta.data), vdj_all$barcode)
   
-  # Add metadata — using rownames as index
+  # Add metadata using rownames as index
   seurat@meta.data[common, "clonotype_id"] <- vdj_all[common, "clonotype_id"]
   seurat@meta.data[common, "TCRa_cdr3"] <- vdj_all[common, "TRA"]
   seurat@meta.data[common, "TCRb_cdr3"] <- vdj_all[common, "TRB"]
@@ -435,7 +461,8 @@ for (sample in names(seurat_list)) {
 }
 ```
 
-###INTEGRATE 
+
+##INTEGRATION 
 ```{r}
 for (i in names(seurat_list)) {
   seurat_list[[i]] <- FindVariableFeatures(seurat_list[[i]], selection.method = "vst", nfeatures = 2000)
@@ -465,7 +492,7 @@ integrated$stim <- recode(integrated$stim,
                           "BL6_VEH" = "C57BL/6J+VEH",
                           "BL6_SEB" = "C57BL/6J+SEB",
                           "C3H_VEH" = "C3H/HeJ+VEH",
-                          "C3H_SEBgz" = "C3H/HeJ+SEB")
+                          "C3H_SEB" = "C3H/HeJ+SEB")
 
 # Convert to factor and set the desired order
 integrated$stim <- factor(integrated$stim, levels = c("C57BL/6J+VEH",
@@ -479,7 +506,7 @@ saveRDS(integrated, "integrated.RDS")
 ```
 
 
-###CD3+ Object
+## CD3+ T CELL SUBSET
 ```{r}
 #subset T cells for new object
 DefaultAssay(integrated) <- "RNA"
@@ -499,7 +526,7 @@ saveRDS(cd3_pos, "cd3_pos.RDS")
 ```
 
 ```{r}
-DimPlot(cd3_pos, label = T, split.by = "stim")
+DimPlot(cd3_pos, label = TRUE, split.by = "stim")
 ```
  
 ```{r}
@@ -518,13 +545,18 @@ write.csv(cd3_pos.markersADT, "cd3_posADT_cluster_markers.csv")
 ```{r}
 #finding markers for each cluster
 DefaultAssay(cd3_pos) <- "RNA"
-cd3_pos.markersADT <- FindAllMarkers(cd3_pos, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
-cd3_pos.markersADT %>%
+cd3_pos.markersRNA <- FindAllMarkers(cd3_pos, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+cd3_pos.markersRNA %>%
     group_by(cluster) %>%
     slice_max(n = 2, order_by = avg_log2FC)
 ```
 
 ```{r}
-write.csv(cd3_pos.markersADT, "cd3_pos_cluster_markers.csv")
+write.csv(cd3_pos.markersRNA, "cd3_posRNA_cluster_markers.csv")
+```
+
+
+```{r, eval=TRUE}
+sessionInfo()
 ```
 

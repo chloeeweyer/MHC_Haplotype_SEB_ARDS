@@ -1,21 +1,43 @@
 ---
-title: "SEB Manuscript Code"
+title: "SEB ARDS H2 Manuscript Figures Code"
 author: "Chloe Weyer-Nichols"
 output:
+  html_document:
+    toc: true
+    toc_float: true
   pdf_document: default
-  html_document: default
 editor_options:
   chunk_output_type: console
 ---
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(verbose = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(
+  eval = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
 ```
-#Host MHC Haplotypes Dictate Susceptibility to Bacterial Superantigen-Induced Acute Respiratory Distress Syndrome 
-## Authors: Chloe E. Weyer-Nichols1, Taylor H. Carter1, Kiesha M. Wilson1, Prakash Nagarkatti1, Mitzi Nagarkatti1*
-### Institutions: 1Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
-### Corresponding Author: Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
-##Manuscript Code for Reproducibility
-###Loading Required Libraries
+
+# H2 Haplotype Determines Susceptibility to Superantigen-Induced Acute Lung Injury 
+## Authors: Chloe E. Weyer-Nichols^1^, Taylor H. Carter^1^, Kiesha M. Wilson^1^, Prakash Nagarkatti^1^, Mitzi Nagarkatti^1*^
+### Institutions: ^1^Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
+### Corresponding Author: ^*^Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
+Figure Code for Reproducibility
+
+**Note:** The processed Seurat objects and V(D)J table used for downstream analysis are available through the associated data repository. These include:
+
+- `integrated.RDS`: integrated Seurat object containing all cells across conditions
+- `cd3_pos.RDS`: CD3e+ T cell subset generated from the integrated object
+- `vdj_all.RDS`: combined V(D)J annotation table
+
+The code below documents the full figure production workflow associated with this manuscript.
+
+```{r}
+set.seed(0311)
+```
+
+
+## Loading Required Libraries
 ```{r}
 library(Seurat)
 library(dplyr) 
@@ -30,13 +52,15 @@ library(tidyr)
 library(gt)
 library(glue)
 library(glmGamPoi)
+library(gprofiler2)
+library(pheatmap)
 ```
 
-##Figure 3
+## Figure 3
 
-####Figure 3A
+### Figure 3A
 ```{r}
-integrated <- readRDS(file = "files/integrated.RDS")
+integrated <- readRDS(file = "integrated.RDS")
 ```
 
 ```{r}
@@ -112,7 +136,7 @@ desired_order_long <- c(
   "Activated CD4+ T Cells",
   "Quiescent ECs",
   "Infiltrating Monocytes",
-  "Proliferating CD8⁺ T cells",
+  "Proliferating CD8+ T cells",
   "Non-Classical Monocytes",
   "Fibroblasts", 
   "cDC1s", 
@@ -132,7 +156,7 @@ desired_order <- c(
   "aCD4+ TC",
   "QECs",
   "iMono",
-  "pCD8⁺ TC",
+  "pCD8+ TC",
   "ncMono",
   "Fib", 
   "cDC1s", 
@@ -152,7 +176,7 @@ cluster_colors_long <- c(
   "Activated CD4+ T Cells" = "#00c19f",
   "Quiescent ECs" = "#01bfc4",
   "Infiltrating Monocytes" = "#00b9e3",
-  "Proliferating CD8⁺ T cells" = "#00adfa",
+  "Proliferating CD8+ T cells" = "#00adfa",
   "Non-Classical Monocytes" = "#609cff",
   "Fibroblasts" = "#af87ff", 
   "cDC1s" = "#db72fb", 
@@ -173,7 +197,7 @@ cluster_colors <- c(
   "aCD4+ TC" = "#00c19f",
   "QECs" = "#01bfc4",
   "iMono" = "#00b9e3",
-  "pCD8⁺ TC" = "#00adfa",
+  "pCD8+ TC" = "#00adfa",
   "ncMono" = "#609cff",
   "Fib" = "#af87ff", 
   "cDC1s" = "#db72fb", 
@@ -183,7 +207,7 @@ cluster_colors <- c(
 			                         )
 ```
 
-####Figure 3B
+### Figure 3B
 ```{r}
 univADTfeatures <- c("Ms.CD45","HuMs.CD11b","Ms.CD31","Ms.CD19","Ms.CD3","Ms.CD86","Ms.Ly.6G","Ms.CD4","Ms.CD8b")
 
@@ -203,7 +227,7 @@ FeaturePlot(
 ```
 
 
-####Figure3C
+### Figure 3C
 ```{r}
 marker_genes <- c("Pecam1", "Vegfa", "Cd8a", "Lef1", "Cd19", "Cd79a", "Ncr1", "Klrd1", "Cd8b1", "Cd69", "Ccl2", "Fcgr1", "Siglecf", "Itgax", "Ly6g", "S100a8",
 "Icos", "Cd4", "Cdh5", "Cd34", "Cd14", "Vcan", "Mki67", "Ezh2", "Nr4a1", "Treml4", "Col1a1", "Sparc", "Alcam", "H2-Eb1", "Aqp1", "Plvap", "Siglech", "Tcf4", "Postn", "Epas1")
@@ -231,7 +255,7 @@ DoHeatmap(integrated, features = marker_genes, size = 0, label = FALSE) +
   ggtitle("Marker Gene Expression Across Clusters")
 ```
 
-####Figure 3D
+### Figure 3D
 ```{r}
 # Convert table to dataframe
 pt <- table(Idents(integrated), integrated$stim)
@@ -267,7 +291,7 @@ ggplot(pt, aes(x = "", y = Percentage, fill = CellType)) +
 ```
 
 
-####Figure 3E
+### Figure 3E
 ```{r}
 legend_df <- table(Idents(integrated), integrated$stim) %>%
   as.data.frame() %>%
@@ -309,13 +333,13 @@ legend_wide %>%
     `C3H/HeJ+SEB` = "C3H+SEB %"
   ) %>%
   cols_align(align = "left", columns = "CellType") %>%
-  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  # ✅ Center percentage columns
+  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  
   fmt_number(columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`), decimals = 1) %>%
   opt_table_font(font = list(
     google_font("Roboto"),
     default_fonts()
   )) %>%
-  tab_style(  # ✅ Bold the data cells
+  tab_style(  
     style = cell_text(weight = "bold"),
     locations = cells_body()
   ) %>%
@@ -336,13 +360,7 @@ legend_wide %>%
 ```
 
 
-####Figure 3F
-```{r}
-#https://satijalab.org/seurat/articles/cell_cycle_vignette
-exp.mat <- read.table(file = "files/nestorawa_forcellcycle_expressionMatrix.txt",
-    header = TRUE, as.is = TRUE, row.names = 1)
-```
-
+### Figure 3F
 ```{r}
 # A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
 # segregate this list into markers of G2/M phase and markers of S phase
@@ -382,13 +400,13 @@ DimPlot(integrated, split.by = "stim", ncol = 2, pt.size = 1) &
 ```
 
 
-##Figure 4
+## Figure 4
 
-####Figure 4A
+### Figure 4A
 
 ```{r}
 #loading unannotated RDS object
-cd3_pos <- readRDS(file = "files/cd3_pos.RDS")
+cd3_pos <- readRDS(file = "cd3_pos.RDS")
 #numeric cluster names
 Idents(cd3_pos) <- cd3_pos$seurat_clusters
 numeric_cluster_ids <- Idents(cd3_pos)
@@ -435,7 +453,7 @@ print(umap1)
 ```
 
 
-####Figure 4B
+### Figure 4B
 ```{r}
 TCellADT <- c("Ms.CD3","Ms.CD4","Ms.CD8b","Ms.TCR.Vb8.1-8.2","Ms.TCR.Vb5.1-5.2","Ms.CD25","HuMs.CD44","Ms.CD69")
 
@@ -454,7 +472,7 @@ FeaturePlot(cd3_pos,
 ```
 
 
-####Figure 4C
+### Figure 4C
 ```{r}
 FeaturePlot(cd3_pos, features = "Ms.TCR.Vb8.1-8.2", max.cutoff = 50, ncol = 2, split.by = "stim", pt.size = 1) &
   theme(plot.title = element_text(size = 18, face = "bold"),
@@ -465,7 +483,7 @@ FeaturePlot(cd3_pos, features = "Ms.TCR.Vb8.1-8.2", max.cutoff = 50, ncol = 2, s
 ```
 
 
-####Figre 4D.1
+### Figure 4D.1
 ```{r}
 #SET DESIRED ORDER AND COLORS
 desired_order <- c(
@@ -513,17 +531,17 @@ condition_labels <- c("C57BL/6J+VEH" = "C57BL/6J+VEH",
 ggplot(pt, aes(x = "", y = Percentage, fill = CellType)) +
   geom_bar(stat = "identity", width = 1, color = "black") +
   coord_polar(theta = "y") +
-  facet_wrap(~Condition, ncol = 2, labeller = labeller(Condition = "C:\\Users\\cweyer\\OneDrive - USC School of Medicine\\Data\\SEB Project\\scRNA_CITE_TCR_seq\\condition_labels")) +
+  facet_wrap(~Condition, ncol = 2, labeller = labeller(Condition = condition_labels)) +
   theme_void() +
   theme(
-    legend.position = "none",  # ✅ Completely removes legend
+    legend.position = "none", 
     strip.text = element_text(face = "bold", size = 20, color = "black")
   ) +
   scale_fill_manual(values = cluster_colors)
 ```
 
 
-####Figure 4D.2
+### Figure 4D.2
 ```{r}
 legend_df <- table(Idents(cd3_pos), cd3_pos$stim) %>%
   as.data.frame() %>%
@@ -565,13 +583,13 @@ legend_wide %>%
     `C3H/HeJ+SEB` = "C3H+SEB %"
   ) %>%
   cols_align(align = "left", columns = "CellType") %>%
-  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  # ✅ Center percentage columns
+  cols_align(align = "center", columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`)) %>%  
   fmt_number(columns = c(`C57BL/6J+VEH`, `C57BL/6J+SEB`, `C3H/HeJ+VEH`, `C3H/HeJ+SEB`), decimals = 1) %>%
   opt_table_font(font = list(
     google_font("Roboto"),
     default_fonts()
   )) %>%
-  tab_style(  # ✅ Bold the data cells
+  tab_style(
     style = cell_text(weight = "bold"),
     locations = cells_body()
   ) %>%
@@ -592,10 +610,12 @@ legend_wide %>%
 ```
 
 
-####Figure 4E
-
+### Figure 4E
 ```{r}
 # Ensure barcodes in vdj_all match those in cd3_pos
+
+vdj_all <- readRDS(file = "vdj_all.RDS")
+
 vdj_filtered <- vdj_all[vdj_all$barcode %in% colnames(cd3_pos), ]
 
 # Count v_gene usage by sample_id
@@ -637,14 +657,14 @@ pheatmap::pheatmap(as.matrix(heatmap_matrix),
                    cluster_cols = F,
                    color = colorRampPalette(c("white", "steelblue"))(100),
                    main = "Top V Genes",
-                   fontsize = 16,                 # Increase font size
-                   fontsize_row = 14,             # Row (gene) labels
-                   fontsize_col = 14,             # Column (stim) labels
+                   fontsize = 16,                 
+                   fontsize_row = 14,             
+                   fontsize_col = 14,             
                    angle_col = 0)
 
 ```
 
-####Figure 4F
+### Figure 4F
 ```{r}
 # Define Vβ8 family gene names
 vb8_genes <- c("TRBV13-1","TRBV13-2","TRBV13-3")
@@ -662,7 +682,7 @@ TRBV13_vec <- setNames(vdj_all$TRBV13_subfamily, vdj_all$barcode)
 common_barcodes <- intersect(Cells(cd3_pos), names(TRBV13_vec))
 
 # Assign using named vector indexing
-cd3_pos$TRBV13_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV13_subfamily <- FALSE  
 cd3_pos$TRBV13_subfamily[common_barcodes] <- TRBV13_vec[common_barcodes]
 
 # Convert remaining NAs to FALSE
@@ -685,12 +705,12 @@ DimPlot(cd3_pos, group.by = "TRBV13_subfamily",
 
 ```
 
-####Figure 4G
+### Figure 4G
 ```{r}
-# Define Vβ8 family gene names
+# Define Vβ3 family gene names
 vb3_genes <- c("TRBV26")
 
-# Detect TRBV13-x even in combined v_gene strings
+# Detect TRBV26 even in combined v_gene strings
 vdj_all$TRBV26_subfamily <- sapply(vdj_all$v_gene, function(v) {
   any(sapply(vb3_genes, function(target) grepl(target, v)))
 })
@@ -703,7 +723,7 @@ TRBV26_vec <- setNames(vdj_all$TRBV26_subfamily, vdj_all$barcode)
 common_barcodes <- intersect(Cells(cd3_pos), names(TRBV26_vec))
 
 # Assign using named vector indexing
-cd3_pos$TRBV26_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV26_subfamily <- FALSE  
 cd3_pos$TRBV26_subfamily[common_barcodes] <- TRBV26_vec[common_barcodes]
 
 # Convert remaining NAs to FALSE
@@ -717,7 +737,7 @@ DimPlot(cd3_pos, group.by = "TRBV26_subfamily",
         split.by = "stim",
         cols = c("gray", "red"), 
         pt.size = 1) +
-  ggtitle("Cells Expressing TRBV13-1/2/3") +
+  ggtitle("Cells Expressing TRBV26") +
   theme(
     plot.title = element_text(face = "bold"),
     legend.text = element_text(face = "bold"),
@@ -726,12 +746,12 @@ DimPlot(cd3_pos, group.by = "TRBV26_subfamily",
 
 ```
 
-####Figure 4H
+### Figure 4H
 ```{r}
-# Define Vβ8 family gene names
+# Define Vβ7 family gene names
 vb7_genes <- c("TRBV29")
 
-# Detect TRBV13-x even in combined v_gene strings
+# Detect TRBV29 even in combined v_gene strings
 vdj_all$TRBV29_subfamily <- sapply(vdj_all$v_gene, function(v) {
   any(sapply(vb7_genes, function(target) grepl(target, v)))
 })
@@ -744,7 +764,7 @@ TRBV29_vec <- setNames(vdj_all$TRBV29_subfamily, vdj_all$barcode)
 common_barcodes <- intersect(Cells(cd3_pos), names(TRBV29_vec))
 
 # Assign using named vector indexing
-cd3_pos$TRBV29_subfamily <- FALSE  # initialize to FALSE
+cd3_pos$TRBV29_subfamily <- FALSE 
 cd3_pos$TRBV29_subfamily[common_barcodes] <- TRBV29_vec[common_barcodes]
 
 # Convert remaining NAs to FALSE
@@ -758,7 +778,7 @@ DimPlot(cd3_pos, group.by = "TRBV29_subfamily",
         split.by = "stim",
         cols = c("gray", "red"), 
         pt.size = 1) +
-  ggtitle("Cells Expressing TRBV13-1/2/3") +
+  ggtitle("Cells Expressing TRBV29") +
   theme(
     plot.title = element_text(face = "bold"),
     legend.text = element_text(face = "bold"),

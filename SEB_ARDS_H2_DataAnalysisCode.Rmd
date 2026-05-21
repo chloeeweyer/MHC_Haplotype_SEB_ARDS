@@ -502,7 +502,7 @@ integrated$stim <- factor(integrated$stim, levels = c("C57BL/6J+VEH",
 ```
 
 ```{r}
-JoinLayers(integrated, layers = c("data","counts","scale.data"))
+integrated <- JoinLayers(integrated, layers = c("data","counts","scale.data"))
 ```
 
 ```{r, eval=FALSE}

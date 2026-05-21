@@ -19,9 +19,9 @@ knitr::opts_chunk$set(
 ```
 
 # H2 Haplotype Determines Susceptibility to Superantigen-Induced Acute Lung Injury 
-## Authors: Chloe E. Weyer-Nichols^1^, Taylor H. Carter^1^, Kiesha M. Wilson^1^, Prakash Nagarkatti^1^, Mitzi Nagarkatti^1*^
-### Institutions: ^1^Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29208, USA
-### Corresponding Author: ^*^Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 29208, USA
+## Authors: Chloe E. Weyer-Nichols^1^, Chintada Nageswara Rao^2^, Taylor H. Carter^1^, Kiesha M. Wilson^1^, Prakash Nagarkatti^1^, Mitzi Nagarkatti^1*^
+### Institutions: ^1^Department of Pathology, Microbiology, and Immunology, University of South Carolina School of Medicine, Columbia, SC 29209, USA; ^2^ Department of Drug Discovery and Biomedical Sciences, College of Pharmacy, University of South Carolina, Columbia, SC, 29208, USA
+### Corresponding Author: ^*^Mitzi Nagarkatti, Ph.D., Basic Science Bldg. 1, Rm C-26, Columbia, SC, 2929, USA
 Data Analysis/Quality Control Code for Reproducibility
 
 **Note:** The processed Seurat objects and V(D)J table used for downstream analysis are available through the associated data repository. These include:

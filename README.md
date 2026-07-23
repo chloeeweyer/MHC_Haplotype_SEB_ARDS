@@ -79,7 +79,7 @@ Additional package dependencies may be required for specific downstream analyses
 
 ## Manuscript Status
 
-Manuscript in preparation.
+Manuscript under review with Advanced Science as of 2026/07/22.
 
 ## Author
 

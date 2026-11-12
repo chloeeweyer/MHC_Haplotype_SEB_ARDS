@@ -79,7 +79,7 @@ Additional package dependencies may be required for specific downstream analyses
 
 ## Manuscript Status
 
-Manuscript under review with Advanced Science as of 2026/07/22.
+Manuscript under review with The Journal of Immunology as of 2026/11/12.
 
 ## Author
 
